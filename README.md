@@ -1,2 +1,1 @@
 # reminder-app
-hello man
