@@ -2,7 +2,6 @@ import "./App.css";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import DateTimePicker from "react-datetime-picker";
-// import twilio from "twilio";
 
 //getting data from local storage
 const getLocalData=() =>{
@@ -20,62 +19,69 @@ const getLocalData=() =>{
 function App() {
   const [reminderMsg, setReminderMsg] = useState(""); 
   const [remindAt, setRemindAt] = useState();
+
+  // this one is using the local storage which doesn't give load to the usestate and also all the changes made will appear 
+  // on the page
   const [reminderList, setReminderList] = useState(getLocalData());//instead of giving empty array pass a func which gets data
-  const [cnt, setcnt]=useState(0)//this is used to maintain the count of reminders that's it
+  
+  //now the below thing is to get all reminders whenever there is a change made i.e added or website reloaded as such
+  // useEffect(()=>{//for that we make a get request to our specified route which will return a response to our frontend
+  //   axios.get('http://localhost:5000/getreminders')
+  //   .then((response) =>{
+  //     // console.log(response.data);//to verify whether we are getting the data or not
+  //     setReminderList(response.data);
+  //   })
+  // },[])
+
   const addReminder=() =>{
-    axios.post('http://localhost:5000/chat',{
-        todo:"Reminder Added"
-    })
-    if(!reminderMsg)
-    {
-      // alert("please Fill the data");
-      console.log("please fill the data");
-    }
-    else{
       const mynewipdata={
         id: new Date().getTime().toString(),
         name:reminderMsg,
         remindtime:remindAt,
       };
-      console.log(mynewipdata.name)
-      setcnt(cnt+1)//every time uh add reminder increment the cnt
-      console.log(cnt+1)//this is just to verify
-      setReminderList([...reminderList, mynewipdata]);//then push the reminder data into the reminderList
-      setReminderMsg("");//then erase all the data so dat uh can add new reminder
-      setRemindAt();
-    }
-
+      axios.post('http://localhost:5000/addreminder',{
+        id:mynewipdata.id,
+        name:mynewipdata.name,
+        remindtime:mynewipdata.remindtime,
+      }).then(()=>{//if data is added succefully then send a message to whatsapp message saying reminder added
+        console.log("Reminder Added Successfully");
+        setReminderList([...reminderList, mynewipdata]);//then push the reminder data into the reminderList
+          axios.post('http://localhost:5000/chat',{
+            todo:"Reminder Added Successfully"
+          })
+          //after adding the reminder the fields shld become so that we can add another reminder so set them to empty
+          setRemindAt();
+          setReminderMsg("");
+      })
   };
-  const deleteReminder= (index) =>{
+  //this func deletes the reminder from the localstorage
+  const localdel=(index)=>{
     const updatedList=reminderList.filter((reminder) =>{
-      return reminder.id !== index
+      return reminder.id !== index;
     })
     setReminderList(updatedList)
-    
-    //below is just to check whether working or not
-    setcnt(cnt-1)//whenever uh delete a reminder then decrement the cnt
-    if(cnt===1)//if uh deleted the last reminder then it means no reminders are left
-     console.log("no reminders left")
-    else
-     console.log(cnt-1)
   }
-  //adding local storage
+  //this is for deleting the reminder 
+  const deleteReminder=async(id)=>{
+    //whenver user clicks on delete button this func will execute in which we are making a delete req with the reminder id
+    await axios.delete(`http://localhost:5000/deletereminder/${id}`).then((res)=>{
+      //when it returns a promise then it means the req has been processed now we need to also remove that reminder from list too
+      //so for that run filter func in which we return a new list without that reminder
+      console.log("Deleted successfully");
+      })
+      localdel(id);//delete from local storage too
+  }
+
+  // this is the local storage
   useEffect( () =>{
     localStorage.setItem("MyreminderList", JSON.stringify(reminderList));//when you store in reminderList also push it into local storage
-    // console.log(localStorage.length)
   },[reminderList])
 
 
-  //below repeats the task of checking reminders time for every second
+  //the below thing will run for every 1second 
   useEffect(() => {
     const interval = setInterval(() => {
-      if(cnt===0)//if no reminders added then it means list is empty display dat
-      {
-         console.log("list is empty")
-      }
-      else
-      {
-        //else iterate through the array and check their date and time details
+        //iterate through the array and check their date and time details
         reminderList.forEach(reminder => {
           const now=new Date()
           // console.log(now)
@@ -89,11 +95,10 @@ function App() {
             deleteReminder(reminder.id)
           }
         });
-      }
     }, 1000);
     return () => clearInterval(interval);
   },);
-  
+
   return (
     <div className="App">
       <div className="homepage">
@@ -104,6 +109,7 @@ function App() {
             placeholder="Reminder notes here...."
             value={reminderMsg}
             onChange={(e) => setReminderMsg(e.target.value)}
+            required
           />
           
           <DateTimePicker
@@ -115,6 +121,7 @@ function App() {
             dayPlaceholder="DD"
             monthPlaceholder="MM"
             yearAriaLabel="YYYY"
+            required
           />
           <div className="button" onClick={addReminder}>
             Add Reminder 
@@ -128,7 +135,6 @@ function App() {
                 <h3>Remind Me at ⏰:</h3>
                 <p>{String(new Date(reminder.remindtime.toLocaleString("en-US", {timezone:"Asia/Kolkata"})))}</p>
                 <div className="button" onClick={() => deleteReminder(reminder.id)}>Delete</div>
-                {/* <div className="button">Update</div> */}
               </div>
             ))
         }    
